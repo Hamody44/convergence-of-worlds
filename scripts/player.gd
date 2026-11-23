@@ -137,10 +137,11 @@ func _physics_process(delta: float) -> void:
 		camera_yaw += camera_turn * KEYBOARD_CAMERA_TURN_SPEED * delta
 		_apply_camera_rotation()
 	var input_vector := _get_movement_input()
-	# Use the player's local axes for deterministic controls.
-	# W/Up = local -Z, S/Down = local +Z, A/Left = local -X, D/Right = local +X.
+	# Rotate movement with the current camera yaw.
+	# W/Up follows the camera forward direction; S/Down follows its backward direction.
 	var local_movement := Vector3(input_vector.x, 0.0, -input_vector.y)
-	var movement := global_transform.basis * local_movement
+	var camera_movement_basis := Basis(Vector3.UP, rotation.y + camera_yaw)
+	var movement := camera_movement_basis * local_movement
 	movement.y = 0.0
 	if movement.length_squared() > 0.001:
 		movement = movement.normalized()
