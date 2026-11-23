@@ -199,12 +199,20 @@ func _get_facing_direction() -> Vector3:
 	return Basis(Vector3.UP, rotation.y + camera_yaw) * Vector3(0.0, 0.0, -1.0)
 
 func _resolve_basic_hit(damage: float) -> void:
-	# Area3D overlap lists update on the physics step, not immediately after monitoring=true.
+	# Keep the Area3D active, then use a camera-facing physics query after the physics step.
 	await get_tree().physics_frame
 	if not is_instance_valid(basic_hitbox):
 		return
-	for body: Node3D in basic_hitbox.get_overlapping_bodies():
-		if body.has_method("take_damage"):
+	var facing_direction := _get_facing_direction()
+	var query := PhysicsShapeQueryParameters3D.new()
+	var hit_shape := BoxShape3D.new()
+	hit_shape.size = Vector3(1.8, 1.6, 2.2)
+	query.shape = hit_shape
+	query.transform = Transform3D(Basis(Vector3.UP, rotation.y + camera_yaw), global_position + facing_direction * 1.25 + Vector3.UP)
+	query.collision_mask = 4
+	for result: Dictionary in get_world_3d().direct_space_state.intersect_shape(query):
+		var body: Node = result.get("collider")
+		if body != null and body.has_method("take_damage"):
 			body.take_damage(damage)
 	var timer := get_tree().create_timer(0.12)
 	timer.timeout.connect(func() -> void:
@@ -255,7 +263,7 @@ func _execute_skill(skill_id: String) -> void:
 			_spawn_ring_effect(Color("#22d3ee"), 1.5, 1.4)
 		"spirit_step":
 			var old_position := global_position
-			global_position += -global_transform.basis.z * 5.5
+			global_position += _get_facing_direction() * 5.5
 			_spawn_trail(old_position, global_position, Color("#22d3ee"))
 		"immortal_sword_qi":
 			_spawn_projectile((35.0 + stats.wisdom * 5.0) * damage_scale, Color("#67e8f9"), 21.0, "blade")
@@ -272,7 +280,7 @@ func _execute_skill(skill_id: String) -> void:
 			_spawn_projectile((32.0 + stats.strength * 6.0) * damage_scale, Color("#fb923c"), 17.0, "blade")
 		"knight_dash":
 			var dash_start := global_position
-			global_position += -global_transform.basis.z * 6.0
+			global_position += _get_facing_direction() * 6.0
 			_damage_in_front(38.0 + stats.strength * 7.0, 3.0)
 			_spawn_trail(dash_start, global_position, Color("#fbbf24"))
 		"golden_aura":
@@ -350,7 +358,8 @@ func _reset_energy() -> void:
 func _sync_energy_to_stats() -> void:
 	match stats.chosen_path:
 		PlayerStats.Path.CULTIVATION:
-			stats.qi = path_energy
+			# Current Inner Qi is represented by path_energy; stats.qi is progression only.
+			pass
 		PlayerStats.Path.MAGIC:
 			stats.mana = path_energy
 		PlayerStats.Path.KNIGHTHOOD:
@@ -400,7 +409,8 @@ func _damage_in_front(damage: float, distance: float) -> void:
 	var box := BoxShape3D.new()
 	box.size = Vector3(2.5, 2.4, distance)
 	query.shape = box
-	query.transform = Transform3D(Basis.looking_at(-global_transform.basis.z, Vector3.UP), global_position - global_transform.basis.z * (distance * 0.5) + Vector3.UP)
+	var facing_direction := _get_facing_direction()
+	query.transform = Transform3D(Basis(Vector3.UP, rotation.y + camera_yaw), global_position + facing_direction * (distance * 0.5) + Vector3.UP)
 	query.collision_mask = 4
 	for result: Dictionary in get_world_3d().direct_space_state.intersect_shape(query):
 		var body: Node = result.get("collider")
@@ -410,7 +420,8 @@ func _damage_in_front(damage: float, distance: float) -> void:
 func _spawn_projectile(damage: float, color: Color, projectile_speed: float, kind: String) -> void:
 	var projectile: CombatProjectile = PROJECTILE_SCRIPT.new()
 	get_parent().add_child(projectile)
-	projectile.setup(global_position + Vector3.UP * 1.2 - global_transform.basis.z * 1.3, -global_transform.basis.z, damage, color, projectile_speed, kind)
+	var facing_direction := _get_facing_direction()
+	projectile.setup(global_position + Vector3.UP * 1.2 + facing_direction * 1.3, facing_direction, damage, color, projectile_speed, kind)
 
 func _spawn_shockwave(radius: float, damage: float, color: Color) -> void:
 	var effect := MeshInstance3D.new()
@@ -420,7 +431,7 @@ func _spawn_shockwave(radius: float, damage: float, color: Color) -> void:
 	effect.mesh = mesh
 	effect.material_override = _make_emission_material(color)
 	get_parent().add_child(effect)
-	effect.global_position = global_position - global_transform.basis.z * 2.0 + Vector3.UP
+	effect.global_position = global_position + _get_facing_direction() * 2.0 + Vector3.UP
 	var tween := effect.create_tween()
 	tween.tween_property(effect, "scale", Vector3.ONE * radius, 0.28)
 	tween.tween_callback(func() -> void:
@@ -477,7 +488,7 @@ func _spawn_box_effect(effect_position: Vector3, effect_size: Vector3, color: Co
 	effect.material_override = _make_emission_material(color)
 	get_parent().add_child(effect)
 	effect.global_position = effect_position
-	effect.global_rotation = global_rotation
+	effect.global_rotation = Vector3(0.0, rotation.y + camera_yaw, 0.0)
 	var tween := effect.create_tween()
 	tween.set_parallel(true)
 	tween.tween_property(effect, "scale", Vector3(1.2, 1.2, 1.2), duration)
