@@ -19,6 +19,8 @@ const CARD_COLOR := Color("#1c2d47")
 const ACCENT_COLOR := Color("#f4c95d")
 
 func _ready() -> void:
+	# Keep progression screens above TouchUI and CombatUI so Android touch events reach them.
+	layer = 20
 	stats = player.stats
 	stats.path_selected.connect(_on_path_selected)
 	stats.stat_changed.connect(_on_stat_changed)
@@ -54,6 +56,7 @@ func _build_path_panel() -> void:
 	path_panel.set_anchors_preset(Control.PRESET_CENTER)
 	path_panel.position = Vector2(-390.0, -300.0)
 	path_panel.size = Vector2(780.0, 600.0)
+	path_panel.mouse_filter = Control.MOUSE_FILTER_STOP
 	path_panel.add_theme_stylebox_override("panel", _make_panel_style(PANEL_COLOR, 18))
 	add_child(path_panel)
 	
@@ -98,7 +101,14 @@ func _add_path_card(parent: VBoxContainer, path_value: PlayerStats.Path, title_t
 	card.add_theme_font_size_override("font_size", 19)
 	card.focus_mode = Control.FOCUS_NONE
 	card.pressed.connect(func() -> void: _select_path(path_value))
+	card.gui_input.connect(func(event: InputEvent) -> void: _on_path_card_input(event, path_value))
 	parent.add_child(card)
+
+func _on_path_card_input(event: InputEvent, path_value: PlayerStats.Path) -> void:
+	# Explicit screen-touch fallback for Android devices where Button.pressed may not fire.
+	if event is InputEventScreenTouch and event.pressed:
+		_select_path(path_value)
+		get_viewport().set_input_as_handled()
 
 func _build_soul_panel() -> void:
 	soul_panel = PanelContainer.new()
