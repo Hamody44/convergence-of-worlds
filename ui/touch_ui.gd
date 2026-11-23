@@ -21,7 +21,7 @@ func _build_ui() -> void:
 	add_child(root)
 	
 	var hint := Label.new()
-	hint.text = "WASD / Touch   •   Space / Jump   •   J / Attack"
+	hint.text = "W/S Move   •   A/D Camera   •   Touch D-pad / Drag Look   •   Space / Jump   •   J / Attack"
 	hint.position = Vector2(24.0, 20.0)
 	hint.add_theme_color_override("font_color", Color(0.8, 0.88, 1.0, 0.8))
 	hint.add_theme_font_size_override("font_size", 18)

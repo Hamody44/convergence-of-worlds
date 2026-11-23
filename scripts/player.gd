@@ -10,6 +10,7 @@ signal skill_state_changed(slot: int, skill_name: String, unlocked: bool, cooldo
 const CAMERA_DISTANCE: float = 7.5
 const CAMERA_HEIGHT: float = 2.4
 const CAMERA_SENSITIVITY: float = 0.012
+const KEYBOARD_CAMERA_TURN_SPEED: float = 2.4
 const BASE_JUMP_VELOCITY: float = 7.0
 const PROJECTILE_SCRIPT := preload("res://scripts/combat_projectile.gd")
 
@@ -127,6 +128,14 @@ func _build_basic_hitbox() -> void:
 
 func _physics_process(delta: float) -> void:
 	_update_combat_timers(delta)
+	var camera_turn := 0.0
+	if Input.is_action_pressed("move_left"):
+		camera_turn -= 1.0
+	if Input.is_action_pressed("move_right"):
+		camera_turn += 1.0
+	if not is_zero_approx(camera_turn):
+		camera_yaw += camera_turn * KEYBOARD_CAMERA_TURN_SPEED * delta
+		_apply_camera_rotation()
 	var input_vector := _get_movement_input()
 	# Use the player's local axes for deterministic controls.
 	# W/Up = local -Z, S/Down = local +Z, A/Left = local -X, D/Right = local +X.
@@ -163,10 +172,6 @@ func _process(_delta: float) -> void:
 func _get_movement_input() -> Vector2:
 	# Use explicit signs: W/Up = forward, S/Down = backward.
 	var keyboard := Vector2.ZERO
-	if Input.is_action_pressed("move_left"):
-		keyboard.x -= 1.0
-	if Input.is_action_pressed("move_right"):
-		keyboard.x += 1.0
 	if Input.is_action_pressed("move_forward"):
 		keyboard.y += 1.0
 	if Input.is_action_pressed("move_backward"):
