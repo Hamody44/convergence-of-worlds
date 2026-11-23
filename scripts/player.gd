@@ -130,11 +130,10 @@ func _physics_process(delta: float) -> void:
 	var input_vector := _get_movement_input()
 	var camera_basis := camera.global_transform.basis
 	var forward := -camera_basis.z
-	var right := camera_basis.x
 	forward.y = 0.0
-	right.y = 0.0
 	forward = forward.normalized()
-	right = right.normalized()
+	# Derive the right vector from forward so left/right never mirror on the tablet.
+	var right := forward.cross(Vector3.UP).normalized()
 	var movement := (right * input_vector.x + forward * input_vector.y)
 	if movement.length_squared() > 1.0:
 		movement = movement.normalized()
@@ -165,8 +164,19 @@ func _process(_delta: float) -> void:
 	_emit_skill_states()
 
 func _get_movement_input() -> Vector2:
-	var keyboard := Input.get_vector("move_left", "move_right", "move_forward", "move_backward")
-	return (keyboard + touch_move).limit_length(1.0)
+	# Use explicit signs: W/Up = forward, S/Down = backward.
+	var keyboard := Vector2.ZERO
+	if Input.is_action_pressed("move_left"):
+		keyboard.x -= 1.0
+	if Input.is_action_pressed("move_right"):
+		keyboard.x += 1.0
+	if Input.is_action_pressed("move_forward"):
+		keyboard.y += 1.0
+	if Input.is_action_pressed("move_backward"):
+		keyboard.y -= 1.0
+	# The touch D-pad uses Vector2.UP for its visual up button, so invert only its Y axis.
+	var touch_input := Vector2(touch_move.x, -touch_move.y)
+	return (keyboard + touch_input).limit_length(1.0)
 
 func basic_attack() -> void:
 	if attack_cooldown > 0.0:
