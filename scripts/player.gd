@@ -128,21 +128,18 @@ func _build_basic_hitbox() -> void:
 func _physics_process(delta: float) -> void:
 	_update_combat_timers(delta)
 	var input_vector := _get_movement_input()
-	var camera_basis := camera.global_transform.basis
-	var forward := -camera_basis.z
-	forward.y = 0.0
-	forward = forward.normalized()
-	# Derive the right vector from forward so left/right never mirror on the tablet.
-	var right := forward.cross(Vector3.UP).normalized()
-	var movement := (right * input_vector.x + forward * input_vector.y)
+	# Use the player's local axes for deterministic controls.
+	# W/Up = local -Z, S/Down = local +Z, A/Left = local -X, D/Right = local +X.
+	var local_movement := Vector3(input_vector.x, 0.0, -input_vector.y)
+	var movement := global_transform.basis * local_movement
+	movement.y = 0.0
+	if movement.length_squared() > 0.001:
+		movement = movement.normalized()
 	if movement.length_squared() > 1.0:
 		movement = movement.normalized()
 	var target_speed := stats.get_move_speed() * golden_aura_bonus
 	velocity.x = move_toward(velocity.x, movement.x * target_speed, 30.0 * delta)
 	velocity.z = move_toward(velocity.z, movement.z * target_speed, 30.0 * delta)
-	if movement.length_squared() > 0.01:
-		var target_angle := atan2(movement.x, movement.z)
-		rotation.y = lerp_angle(rotation.y, target_angle, minf(delta * 12.0, 1.0))
 	if is_on_floor():
 		if Input.is_action_just_pressed("jump"):
 			velocity.y = current_jump_velocity
