@@ -49,6 +49,18 @@ toggle_soul_tree={
 "deadzone": 0.5,
 "events": [Object(InputEventKey,"physical_keycode":75,"unicode":107)]
 }
+skill_1={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"physical_keycode":49,"unicode":49)]
+}
+skill_2={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"physical_keycode":50,"unicode":50)]
+}
+skill_3={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"physical_keycode":51,"unicode":51)]
+}
 
 [layer_names]
 3d_physics/layer_1="World"

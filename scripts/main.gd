@@ -2,16 +2,20 @@ extends Node3D
 
 const PLAYER_SCRIPT := preload("res://scripts/player.gd")
 const STATS_SCRIPT := preload("res://scripts/player_stats.gd")
+const DUMMY_SCRIPT := preload("res://scripts/training_dummy.gd")
 const TOUCH_UI_SCRIPT := preload("res://ui/touch_ui.gd")
 const PROGRESSION_UI_SCRIPT := preload("res://ui/progression_ui.gd")
+const COMBAT_UI_SCRIPT := preload("res://ui/combat_ui.gd")
 
 var player: ActionRPGPlayer
 
 func _ready() -> void:
 	_build_world()
 	_build_player()
+	_build_training_dummies()
 	_build_touch_ui()
 	_build_progression_ui()
+	_build_combat_ui()
 
 func _build_world() -> void:
 	var environment := WorldEnvironment.new()
@@ -42,7 +46,7 @@ func _build_world() -> void:
 	_make_box("ObstacleC", Vector3(0.0, 0.6, 7.0), Vector3(5.0, 1.2, 2.0), Color("#b45309"))
 	
 	var label := Label3D.new()
-	label.text = "ASCENSION — PHASE 2"
+	label.text = "ASCENSION — PHASE 3"
 	label.position = Vector3(0.0, 4.0, -10.0)
 	label.font_size = 48
 	label.modulate = Color("#f8fafc")
@@ -55,6 +59,16 @@ func _build_player() -> void:
 	player.stats = STATS_SCRIPT.new()
 	player.position = Vector3(0.0, 0.2, 6.0)
 	add_child(player)
+
+func _build_training_dummies() -> void:
+	var first_dummy: TrainingDummy = DUMMY_SCRIPT.new()
+	first_dummy.name = "TrainingDummyA"
+	first_dummy.position = Vector3(-4.0, 0.0, -5.0)
+	add_child(first_dummy)
+	var second_dummy: TrainingDummy = DUMMY_SCRIPT.new()
+	second_dummy.name = "TrainingDummyB"
+	second_dummy.position = Vector3(4.0, 0.0, -5.0)
+	add_child(second_dummy)
 
 func _build_touch_ui() -> void:
 	var touch_ui: TouchUI = TOUCH_UI_SCRIPT.new()
@@ -70,6 +84,12 @@ func _build_progression_ui() -> void:
 	progression_ui.name = "ProgressionUI"
 	progression_ui.player = player
 	add_child(progression_ui)
+
+func _build_combat_ui() -> void:
+	var combat_ui: CombatUI = COMBAT_UI_SCRIPT.new()
+	combat_ui.name = "CombatUI"
+	combat_ui.player = player
+	add_child(combat_ui)
 
 func _on_touch_movement_changed(value: Vector2) -> void:
 	if is_instance_valid(player):

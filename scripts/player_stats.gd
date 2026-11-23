@@ -6,6 +6,7 @@ signal path_selected(path: Path)
 signal stat_changed(stat_name: String, new_value: int)
 signal soul_points_changed(new_value: int)
 signal skill_changed(skill_id: String, unlocked: bool)
+signal progression_changed
 
 enum Path {
 	NONE,
@@ -142,6 +143,18 @@ func get_path_metric() -> String:
 		Path.KNIGHTHOOD:
 			return "Aura Level: %d  |  Aura: %.0f" % [knight_rank, aura]
 	return "Path: Unchosen"
+
+func advance_path_progress(amount: float) -> void:
+	match chosen_path:
+		Path.MARTIAL_ARTS:
+			body_soul_will_sync = minf(body_soul_will_sync + amount, 100.0)
+		Path.CULTIVATION:
+			qi += amount
+		Path.MAGIC:
+			magic_circles = maxi(magic_circles, 1)
+		Path.KNIGHTHOOD:
+			aura += amount
+	progression_changed.emit()
 
 func get_skill_definitions() -> Array[Dictionary]:
 	match chosen_path:
