@@ -1,0 +1,8 @@
+# Mandatory Project & Workflow Rules
+
+1. **Target Environment:** I am developing in **Godot 4.7** on a **Samsung Android tablet touchscreen** (no Windows/Mac desktop).
+2. **Zero Manual Editor Wiring:** Never ask me to manually build complex node trees, adjust inspector properties, or wire signals in the editor UI. Either output complete, valid Godot 4.7 `.tscn` / `project.godot` file contents, or construct all child nodes (`Node.new()`, `add_child()`), UI layouts, and signal connections (`.connect()`) programmatically inside GDScript `_ready()`.
+3. **Hybrid Controls Always:** Every gameplay or UI feature must work smoothly with **touchscreen controls** on an Android tablet (large touch targets, on-screen buttons/gestures) alongside keyboard shortcuts.
+4. **Zero Missing Assets:** Do not reference external `.glb`, `.png`, `.ttf`, or `.wav` files unless they already exist in the workspace. Use Godot built-in primitive meshes, `StandardMaterial3D`, and `Control` nodes so the project runs immediately with zero errors.
+5. **Mandatory Post-Phase ZIP Deliverable:** At the end of EVERY phase or task, package **all newly created and modified files** into a single `.zip` archive (e.g., `phase_update.zip`) preserving their exact relative folder structure (such as `project.godot`, `scenes/...`, `scripts/...`, `ui/...`) so I can download one file on my tablet, extract it into my project root to overwrite/add the files, and press Play immediately.
+6. **Communication Language:** Keep all GDScript code, file names, node names, and in-game English UI labels in English, while writing all explanations, summaries, and instructions to me in **simple, clear Arabic**.
