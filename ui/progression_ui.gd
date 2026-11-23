@@ -12,7 +12,9 @@ var stats_container: VBoxContainer
 var skills_container: VBoxContainer
 var toast_label: Label
 var stat_value_labels: Dictionary = {}
+var stat_plus_buttons: Dictionary = {}
 var skill_buttons: Dictionary = {}
+var stat_action_in_progress: bool = false
 
 const PANEL_COLOR := Color("#101b2d")
 const CARD_COLOR := Color("#1c2d47")
@@ -175,7 +177,7 @@ func _build_soul_panel() -> void:
 	test_button.text = "+1 SOUL POINT (TEST)"
 	test_button.custom_minimum_size = Vector2(0.0, 54.0)
 	test_button.focus_mode = Control.FOCUS_NONE
-	test_button.pressed.connect(func() -> void: stats.add_test_soul_point())
+	test_button.pressed.connect(_on_test_soul_point_pressed)
 	content.add_child(test_button)
 	toast_label = Label.new()
 	toast_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -204,8 +206,9 @@ func _add_stat_row(stat_name: String) -> void:
 	plus_button.custom_minimum_size = Vector2(64.0, 54.0)
 	plus_button.add_theme_font_size_override("font_size", 28)
 	plus_button.focus_mode = Control.FOCUS_NONE
-	plus_button.pressed.connect(func() -> void: _spend_stat(stat_name))
+	plus_button.pressed.connect(_on_stat_button_pressed.bind(stat_name))
 	row.add_child(plus_button)
+	stat_plus_buttons[stat_name] = plus_button
 	stats_container.add_child(row)
 
 func _select_path(path_value: PlayerStats.Path) -> void:
@@ -229,11 +232,23 @@ func _unhandled_input(event: InputEvent) -> void:
 		_toggle_soul_panel()
 
 func _spend_stat(stat_name: String) -> void:
+	if stat_action_in_progress:
+		return
+	stat_action_in_progress = true
 	if stats.spend_soul_point(stat_name):
 		_show_toast("%s increased." % stat_name.capitalize())
 	else:
 		_show_toast("Not enough Soul Points.")
 	_refresh_soul_panel()
+	stat_action_in_progress = false
+
+func _on_stat_button_pressed(stat_name: String) -> void:
+	_spend_stat(stat_name)
+
+func _on_test_soul_point_pressed() -> void:
+	# This action changes only Available Soul Points; it never changes a core stat.
+	stats.add_test_soul_point()
+	_show_toast("+1 Soul Point added.")
 
 func _unlock_skill(skill_id: String) -> void:
 	if stats.unlock_skill(skill_id):
@@ -249,6 +264,7 @@ func _refresh_soul_panel() -> void:
 	soul_points_label.text = "Level: %d    |    Available Soul Points: %d" % [stats.level, stats.soul_points]
 	for stat_name: String in stat_value_labels:
 		stat_value_labels[stat_name].text = str(int(stats.get(stat_name)))
+		stat_plus_buttons[stat_name].disabled = stats.soul_points <= 0
 	for child: Node in skills_container.get_children():
 		child.queue_free()
 	skill_buttons.clear()

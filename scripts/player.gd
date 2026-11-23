@@ -165,7 +165,7 @@ func _physics_process(delta: float) -> void:
 		use_skill(3)
 	move_and_slide()
 	if attack_flash_time > 0.0:
-		attack_marker.rotation.y = sin(attack_flash_time * 24.0) * 0.8
+		attack_marker.rotation.y = camera_yaw + sin(attack_flash_time * 24.0) * 0.8
 
 func _process(_delta: float) -> void:
 	_emit_skill_states()
@@ -187,10 +187,16 @@ func basic_attack() -> void:
 	attack_cooldown = attack_interval
 	attack_flash_time = 0.22
 	var damage := (12.0 + float(stats.strength) * 5.0) * golden_aura_bonus
+	basic_hitbox.rotation.y = camera_yaw
+	attack_marker.rotation.y = camera_yaw
 	basic_hitbox.monitoring = true
 	_resolve_basic_hit(damage)
-	_spawn_box_effect(global_position - global_transform.basis.z * 1.3 + Vector3.UP, Vector3(2.0, 0.16, 0.55), Color("#fde047"), 0.18)
+	var facing_direction := _get_facing_direction()
+	_spawn_box_effect(global_position + facing_direction * 1.3 + Vector3.UP, Vector3(2.0, 0.16, 0.55), Color("#fde047"), 0.18)
 	stats.advance_path_progress(0.15)
+
+func _get_facing_direction() -> Vector3:
+	return Basis(Vector3.UP, rotation.y + camera_yaw) * Vector3(0.0, 0.0, -1.0)
 
 func _resolve_basic_hit(damage: float) -> void:
 	# Area3D overlap lists update on the physics step, not immediately after monitoring=true.
