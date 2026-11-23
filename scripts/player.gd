@@ -130,9 +130,9 @@ func _physics_process(delta: float) -> void:
 	_update_combat_timers(delta)
 	var camera_turn := 0.0
 	if Input.is_action_pressed("move_left"):
-		camera_turn -= 1.0
-	if Input.is_action_pressed("move_right"):
 		camera_turn += 1.0
+	if Input.is_action_pressed("move_right"):
+		camera_turn -= 1.0
 	if not is_zero_approx(camera_turn):
 		camera_yaw += camera_turn * KEYBOARD_CAMERA_TURN_SPEED * delta
 		_apply_camera_rotation()
