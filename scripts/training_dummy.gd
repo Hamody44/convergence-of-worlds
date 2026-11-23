@@ -107,7 +107,7 @@ func _show_damage_number(amount: float) -> void:
 	var tween := damage_label.create_tween()
 	tween.set_parallel(true)
 	tween.tween_property(damage_label, "position", Vector3(0.0, 4.0, 0.0), 0.7)
-	tween.tween_property(damage_label, "modulate:a", 0.0, 0.7)
+	tween.tween_property(damage_label, "modulate", Color(1.0, 1.0, 1.0, 0.0), 0.7)
 	tween.chain().tween_callback(damage_label.queue_free)
 
 func _make_material(color: Color) -> StandardMaterial3D:

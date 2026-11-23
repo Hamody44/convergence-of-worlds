@@ -182,13 +182,23 @@ func basic_attack() -> void:
 	attack_flash_time = 0.22
 	var damage := (12.0 + float(stats.strength) * 5.0) * golden_aura_bonus
 	basic_hitbox.monitoring = true
+	_resolve_basic_hit(damage)
+	_spawn_box_effect(global_position - global_transform.basis.z * 1.3 + Vector3.UP, Vector3(2.0, 0.16, 0.55), Color("#fde047"), 0.18)
+	stats.advance_path_progress(0.15)
+
+func _resolve_basic_hit(damage: float) -> void:
+	# Area3D overlap lists update on the physics step, not immediately after monitoring=true.
+	await get_tree().physics_frame
+	if not is_instance_valid(basic_hitbox):
+		return
 	for body: Node3D in basic_hitbox.get_overlapping_bodies():
 		if body.has_method("take_damage"):
 			body.take_damage(damage)
 	var timer := get_tree().create_timer(0.12)
-	timer.timeout.connect(func() -> void: basic_hitbox.monitoring = false)
-	_spawn_box_effect(global_position - global_transform.basis.z * 1.3 + Vector3.UP, Vector3(2.0, 0.16, 0.55), Color("#fde047"), 0.18)
-	stats.advance_path_progress(0.15)
+	timer.timeout.connect(func() -> void:
+		if is_instance_valid(basic_hitbox):
+			basic_hitbox.monitoring = false
+	)
 
 func use_skill(slot: int) -> void:
 	if stats.chosen_path == PlayerStats.Path.NONE or slot < 1 or slot > 3:
@@ -419,7 +429,7 @@ func _spawn_ring_effect(color: Color, radius: float, duration: float) -> void:
 	var tween := ring.create_tween()
 	tween.set_parallel(true)
 	tween.tween_property(ring, "scale", Vector3.ONE * 1.35, duration)
-	tween.tween_property(ring, "modulate:a", 0.0, duration)
+	tween.tween_property(ring, "modulate", Color(1.0, 1.0, 1.0, 0.0), duration)
 	tween.chain().tween_callback(ring.queue_free)
 
 func _spawn_shield_effect() -> void:
@@ -444,7 +454,7 @@ func _spawn_trail(from_position: Vector3, to_position: Vector3, color: Color) ->
 	trail.global_position = (from_position + to_position) * 0.5
 	trail.look_at(to_position, Vector3.UP)
 	var tween := trail.create_tween()
-	tween.tween_property(trail, "modulate:a", 0.0, 0.45)
+	tween.tween_property(trail, "modulate", Color(1.0, 1.0, 1.0, 0.0), 0.45)
 	tween.tween_callback(trail.queue_free)
 
 func _spawn_box_effect(effect_position: Vector3, effect_size: Vector3, color: Color, duration: float) -> void:
@@ -459,7 +469,7 @@ func _spawn_box_effect(effect_position: Vector3, effect_size: Vector3, color: Co
 	var tween := effect.create_tween()
 	tween.set_parallel(true)
 	tween.tween_property(effect, "scale", Vector3(1.2, 1.2, 1.2), duration)
-	tween.tween_property(effect, "modulate:a", 0.0, duration)
+	tween.tween_property(effect, "modulate", Color(1.0, 1.0, 1.0, 0.0), duration)
 	tween.chain().tween_callback(effect.queue_free)
 
 func _apply_camera_rotation() -> void:
