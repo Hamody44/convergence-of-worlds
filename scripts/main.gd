@@ -3,6 +3,7 @@ extends Node3D
 const PLAYER_SCRIPT := preload("res://scripts/player.gd")
 const STATS_SCRIPT := preload("res://scripts/player_stats.gd")
 const TOUCH_UI_SCRIPT := preload("res://ui/touch_ui.gd")
+const PROGRESSION_UI_SCRIPT := preload("res://ui/progression_ui.gd")
 
 var player: ActionRPGPlayer
 
@@ -10,6 +11,7 @@ func _ready() -> void:
 	_build_world()
 	_build_player()
 	_build_touch_ui()
+	_build_progression_ui()
 
 func _build_world() -> void:
 	var environment := WorldEnvironment.new()
@@ -40,7 +42,7 @@ func _build_world() -> void:
 	_make_box("ObstacleC", Vector3(0.0, 0.6, 7.0), Vector3(5.0, 1.2, 2.0), Color("#b45309"))
 	
 	var label := Label3D.new()
-	label.text = "ASCENSION — PHASE 1"
+	label.text = "ASCENSION — PHASE 2"
 	label.position = Vector3(0.0, 4.0, -10.0)
 	label.font_size = 48
 	label.modulate = Color("#f8fafc")
@@ -63,13 +65,19 @@ func _build_touch_ui() -> void:
 	touch_ui.attack_pressed.connect(_on_touch_attack_pressed)
 	touch_ui.camera_dragged.connect(_on_camera_dragged)
 
+func _build_progression_ui() -> void:
+	var progression_ui: ProgressionUI = PROGRESSION_UI_SCRIPT.new()
+	progression_ui.name = "ProgressionUI"
+	progression_ui.player = player
+	add_child(progression_ui)
+
 func _on_touch_movement_changed(value: Vector2) -> void:
 	if is_instance_valid(player):
 		player.touch_move = value
 
 func _on_touch_jump_pressed() -> void:
 	if is_instance_valid(player) and player.is_on_floor():
-		player.velocity.y = player.JUMP_VELOCITY
+		player.velocity.y = player.current_jump_velocity
 
 func _on_touch_attack_pressed() -> void:
 	if is_instance_valid(player):

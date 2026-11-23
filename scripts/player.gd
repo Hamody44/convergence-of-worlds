@@ -3,16 +3,18 @@ extends CharacterBody3D
 
 @export var stats: PlayerStats = PlayerStats.new()
 
-const JUMP_VELOCITY: float = 7.0
 const CAMERA_DISTANCE: float = 7.5
 const CAMERA_HEIGHT: float = 2.4
 const CAMERA_SENSITIVITY: float = 0.012
+const BASE_JUMP_VELOCITY: float = 7.0
 
 var touch_move: Vector2 = Vector2.ZERO
 var camera_yaw: float = 0.0
 var camera_pitch: float = -0.20
 var attack_cooldown: float = 0.0
 var attack_flash_time: float = 0.0
+var current_jump_velocity: float = BASE_JUMP_VELOCITY
+var attack_interval: float = 0.42
 
 var visual: MeshInstance3D
 var camera_rig: Node3D
@@ -23,6 +25,9 @@ var attack_marker: MeshInstance3D
 func _ready() -> void:
 	_build_player_nodes()
 	_apply_camera_rotation()
+	if stats != null:
+		stats.stat_changed.connect(_on_stat_changed)
+		_sync_derived_stats()
 
 func _build_player_nodes() -> void:
 	collision_layer = 2
@@ -110,7 +115,7 @@ func _physics_process(delta: float) -> void:
 	
 	if is_on_floor():
 		if Input.is_action_just_pressed("jump"):
-			velocity.y = JUMP_VELOCITY
+			velocity.y = current_jump_velocity
 	else:
 		velocity.y -= get_gravity().length() * delta
 	
@@ -129,15 +134,24 @@ func _get_movement_input() -> Vector2:
 func basic_attack() -> void:
 	if attack_cooldown > 0.0:
 		return
-	attack_cooldown = 0.42
+	attack_cooldown = attack_interval
 	attack_flash_time = 0.22
-	# Phase 1 intentionally has no enemies; this is the attack foundation.
 	stats.sword_skill += 0.1
 
 func rotate_camera_by(delta_pixels: Vector2) -> void:
 	camera_yaw -= delta_pixels.x * CAMERA_SENSITIVITY
 	camera_pitch = clampf(camera_pitch - delta_pixels.y * CAMERA_SENSITIVITY, -0.95, 0.35)
 	_apply_camera_rotation()
+
+func _on_stat_changed(_stat_name: String, _new_value: int) -> void:
+	_sync_derived_stats()
+
+func _sync_derived_stats() -> void:
+	if stats == null:
+		return
+	current_jump_velocity = BASE_JUMP_VELOCITY + float(maxi(stats.agility - 1, 0)) * 0.4
+	attack_interval = maxf(0.16, 0.42 - float(maxi(stats.agility - 1, 0)) * 0.025)
+	# Movement speed is read from stats every physics frame, so Speed is immediate.
 
 func _apply_camera_rotation() -> void:
 	if camera_rig == null:

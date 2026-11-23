@@ -45,6 +45,10 @@ attack={
 "deadzone": 0.5,
 "events": [Object(InputEventKey,"physical_keycode":74,"unicode":106), Object(InputEventMouseButton,"button_index":1)]
 }
+toggle_soul_tree={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"physical_keycode":75,"unicode":107)]
+}
 
 [layer_names]
 3d_physics/layer_1="World"
