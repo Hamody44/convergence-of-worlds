@@ -7,6 +7,8 @@ signal stat_changed(stat_name: String, new_value: int)
 signal soul_points_changed(new_value: int)
 signal skill_changed(skill_id: String, unlocked: bool)
 signal progression_changed
+signal experience_changed(current: int, maximum: int)
+signal level_up(new_level: int)
 
 enum Path {
 	NONE,
@@ -64,18 +66,24 @@ func choose_path(new_path: Path) -> bool:
 	soul_points = 3
 	path_selected.emit(chosen_path)
 	soul_points_changed.emit(soul_points)
+	experience_changed.emit(experience, experience_to_next_level)
 	return true
 
 func add_experience(amount: int) -> void:
 	if amount <= 0:
 		return
 	experience += amount
+	var did_level_up := false
 	while experience >= experience_to_next_level:
 		experience -= experience_to_next_level
 		level += 1
-		soul_points += 1
+		soul_points += 2
 		experience_to_next_level = 100 + (level - 1) * 35
+		did_level_up = true
 	soul_points_changed.emit(soul_points)
+	experience_changed.emit(experience, experience_to_next_level)
+	if did_level_up:
+		level_up.emit(level)
 
 func add_test_soul_point() -> void:
 	soul_points += 1

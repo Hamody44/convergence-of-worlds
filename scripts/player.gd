@@ -4,6 +4,9 @@ extends CharacterBody3D
 signal health_changed(current: float, maximum: float)
 signal energy_changed(current: float, maximum: float, energy_name: String)
 signal skill_state_changed(slot: int, skill_name: String, unlocked: bool, cooldown_ratio: float, enough_energy: bool)
+signal defeated
+signal respawned
+signal level_up(new_level: int)
 
 @export var stats: PlayerStats = PlayerStats.new()
 
@@ -34,6 +37,8 @@ var arcane_shield_strength: float = 0.0
 var golden_aura_time: float = 0.0
 var golden_aura_bonus: float = 1.0
 var skill_cooldowns: Dictionary = {}
+var arena_spawn_position: Vector3 = Vector3.ZERO
+var is_defeated: bool = false
 
 var visual: MeshInstance3D
 var camera_rig: Node3D
@@ -43,12 +48,14 @@ var attack_marker: MeshInstance3D
 var basic_hitbox: Area3D
 
 func _ready() -> void:
+	add_to_group("player")
 	_build_player_nodes()
 	_build_basic_hitbox()
 	_apply_camera_rotation()
 	if stats != null:
 		stats.stat_changed.connect(_on_stat_changed)
 		stats.path_selected.connect(_on_path_selected)
+		stats.level_up.connect(_on_stats_level_up)
 		_sync_derived_stats()
 		_reset_energy()
 
@@ -127,6 +134,9 @@ func _build_basic_hitbox() -> void:
 	add_child(basic_hitbox)
 
 func _physics_process(delta: float) -> void:
+	if is_defeated:
+		velocity = Vector3.ZERO
+		return
 	_update_combat_timers(delta)
 	var camera_turn := 0.0
 	if Input.is_action_pressed("move_left"):
@@ -182,7 +192,7 @@ func _get_movement_input() -> Vector2:
 	return (keyboard + touch_input).limit_length(1.0)
 
 func basic_attack() -> void:
-	if attack_cooldown > 0.0:
+	if is_defeated or attack_cooldown > 0.0:
 		return
 	attack_cooldown = attack_interval
 	attack_flash_time = 0.22
@@ -221,7 +231,7 @@ func _resolve_basic_hit(damage: float) -> void:
 	)
 
 func use_skill(slot: int) -> void:
-	if stats.chosen_path == PlayerStats.Path.NONE or slot < 1 or slot > 3:
+	if is_defeated or stats.chosen_path == PlayerStats.Path.NONE or slot < 1 or slot > 3:
 		return
 	var definitions := stats.get_skill_definitions()
 	if definitions.size() < slot:
@@ -290,7 +300,11 @@ func _execute_skill(skill_id: String) -> void:
 	stats.advance_path_progress(1.0)
 
 func take_damage(amount: float) -> void:
+	if is_defeated:
+		return
 	var reduced := amount
+	var willpower_multiplier := clampf(1.0 - float(maxi(stats.willpower - 1, 0)) * 0.05, 0.4, 1.0)
+	reduced *= willpower_multiplier
 	if iron_body_time > 0.0:
 		reduced *= 0.45
 	if arcane_shield_time > 0.0 and arcane_shield_strength > 0.0:
@@ -302,8 +316,29 @@ func take_damage(amount: float) -> void:
 	health = maxf(health - reduced, 0.0)
 	health_changed.emit(health, max_health)
 	if health <= 0.0:
-		health = max_health
-		health_changed.emit(health, max_health)
+		is_defeated = true
+		velocity = Vector3.ZERO
+		defeated.emit()
+
+func respawn_at(spawn_position: Vector3 = arena_spawn_position) -> void:
+	arena_spawn_position = spawn_position
+	global_position = spawn_position
+	velocity = Vector3.ZERO
+	is_defeated = false
+	health = max_health
+	path_energy = max_path_energy
+	attack_cooldown = 0.0
+	health_changed.emit(health, max_health)
+	energy_changed.emit(path_energy, max_path_energy, _energy_name())
+	respawned.emit()
+
+func _on_stats_level_up(new_level: int) -> void:
+	health = max_health
+	path_energy = max_path_energy
+	health_changed.emit(health, max_health)
+	energy_changed.emit(path_energy, max_path_energy, _energy_name())
+	_spawn_level_up_effect()
+	level_up.emit(new_level)
 
 func rotate_camera_by(delta_pixels: Vector2) -> void:
 	camera_yaw -= delta_pixels.x * CAMERA_SENSITIVITY
@@ -497,6 +532,22 @@ func _spawn_box_effect(effect_position: Vector3, effect_size: Vector3, color: Co
 	tween.tween_property(effect, "scale", Vector3(1.2, 1.2, 1.2), duration)
 	tween.tween_property(effect, "modulate", Color(1.0, 1.0, 1.0, 0.0), duration)
 	tween.chain().tween_callback(effect.queue_free)
+
+func _spawn_level_up_effect() -> void:
+	var ring := MeshInstance3D.new()
+	var mesh := TorusMesh.new()
+	mesh.inner_radius = 0.75
+	mesh.outer_radius = 1.05
+	ring.mesh = mesh
+	ring.position = Vector3(0.0, 0.12, 0.0)
+	ring.material_override = _make_emission_material(Color("#facc15"))
+	add_child(ring)
+	var tween := ring.create_tween()
+	tween.set_parallel(true)
+	tween.tween_property(ring, "position:y", 3.0, 1.0)
+	tween.tween_property(ring, "scale", Vector3.ONE * 2.4, 1.0)
+	tween.tween_property(ring, "modulate", Color(1.0, 1.0, 1.0, 0.0), 1.0)
+	tween.chain().tween_callback(ring.queue_free)
 
 func _apply_camera_rotation() -> void:
 	if camera_rig == null:
