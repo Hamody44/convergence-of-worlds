@@ -24,6 +24,7 @@ var is_arabic: bool = false
 
 func _ready() -> void:
 	layer = 10
+	process_mode = Node.PROCESS_MODE_ALWAYS
 	_build_hud()
 	player.health_changed.connect(_on_health_changed)
 	player.energy_changed.connect(_on_energy_changed)
@@ -47,6 +48,7 @@ func _build_hud() -> void:
 	ui_root.name = "CombatHUDRoot"
 	ui_root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	ui_root.mouse_filter = Control.MOUSE_FILTER_PASS
+	ui_root.process_mode = Node.PROCESS_MODE_ALWAYS
 	ui_root.theme = _make_theme()
 	add_child(ui_root)
 
@@ -157,6 +159,8 @@ func _build_respawn_overlay() -> void:
 	respawn_button.add_theme_font_size_override("font_size", 25)
 	respawn_button.focus_mode = Control.FOCUS_NONE
 	respawn_button.pressed.connect(_on_respawn_pressed)
+	respawn_button.gui_input.connect(_on_respawn_button_input)
+	respawn_button.process_mode = Node.PROCESS_MODE_ALWAYS
 	content.add_child(respawn_button)
 
 func _add_skill_button(slot: int) -> void:
@@ -229,7 +233,20 @@ func _on_player_respawned() -> void:
 	respawn_overlay.visible = false
 
 func _on_respawn_pressed() -> void:
+	if not player.is_defeated:
+		return
 	player.respawn_at(player.arena_spawn_position)
+
+func _on_respawn_button_input(event: InputEvent) -> void:
+	if event is InputEventScreenTouch and event.pressed:
+		_on_respawn_pressed()
+		get_viewport().set_input_as_handled()
+
+func _input(event: InputEvent) -> void:
+	if event is InputEventScreenTouch and event.pressed and respawn_overlay != null and respawn_overlay.visible:
+		if respawn_button != null and respawn_button.get_global_rect().has_point(event.position):
+			_on_respawn_pressed()
+			get_viewport().set_input_as_handled()
 
 func _on_language_pressed() -> void:
 	set_language(not is_arabic)

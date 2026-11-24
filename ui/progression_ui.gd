@@ -34,6 +34,7 @@ const ACCENT_COLOR := Color("#f4c95d")
 
 func _ready() -> void:
 	layer = 20
+	process_mode = Node.PROCESS_MODE_ALWAYS
 	stats = player.stats
 	stats.path_selected.connect(_on_path_selected)
 	stats.stat_changed.connect(_on_stat_changed)
@@ -41,10 +42,12 @@ func _ready() -> void:
 	stats.skill_changed.connect(_on_skill_changed)
 	stats.ascension_changed.connect(_on_ascension_changed)
 	stats.breakthrough_completed.connect(_on_breakthrough_completed)
+	stats.save_reset.connect(_on_save_reset)
 	ui_root = Control.new()
 	ui_root.name = "ProgressionUIRoot"
 	ui_root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	ui_root.mouse_filter = Control.MOUSE_FILTER_PASS
+	ui_root.process_mode = Node.PROCESS_MODE_ALWAYS
 	ui_root.theme = _make_theme()
 	add_child(ui_root)
 	_build_hud_button()
@@ -232,6 +235,7 @@ func _on_path_card_input(event: InputEvent, path_value: PlayerStats.Path) -> voi
 
 func _select_path(path_value: PlayerStats.Path) -> void:
 	if stats.choose_path(path_value):
+		get_tree().paused = false
 		path_panel.visible = false
 		soul_tree_button.visible = true
 		_show_toast(_tr("Path chosen. Your Soul Tree is now unlocked.", "تم اختيار المسار. شجرة روحك مفتوحة الآن."))
@@ -344,6 +348,9 @@ func _on_ascension_changed(_rank: int, _progress: float) -> void:
 
 func _on_breakthrough_completed(_new_rank: int) -> void:
 	_refresh_soul_panel()
+
+func _on_save_reset() -> void:
+	get_tree().paused = true
 
 func set_language(arabic: bool) -> void:
 	is_arabic = arabic

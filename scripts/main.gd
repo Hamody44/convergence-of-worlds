@@ -20,6 +20,8 @@ func _ready() -> void:
 	_build_touch_ui()
 	_build_progression_ui()
 	_build_combat_ui()
+	if player.stats.chosen_path == PlayerStats.Path.NONE:
+		get_tree().paused = true
 
 func _build_world() -> void:
 	var environment := WorldEnvironment.new()
@@ -62,6 +64,7 @@ func _build_player() -> void:
 	player.name = "Player"
 	player.stats = STATS_SCRIPT.new()
 	player.stats.load_from_disk()
+	player.stats.path_selected.connect(_on_path_selected)
 	player.position = Vector3(0.0, 0.2, 6.0)
 	player.arena_spawn_position = player.position
 	add_child(player)
@@ -114,6 +117,9 @@ func _build_combat_ui() -> void:
 func _on_language_changed(arabic: bool) -> void:
 	if is_instance_valid(progression_ui):
 		progression_ui.set_language(arabic)
+
+func _on_path_selected(_path_value: PlayerStats.Path) -> void:
+	get_tree().paused = false
 
 func _on_touch_movement_changed(value: Vector2) -> void:
 	if is_instance_valid(player):
