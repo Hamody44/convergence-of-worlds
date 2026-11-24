@@ -361,11 +361,14 @@ func _sync_energy_to_stats() -> void:
 			# Current Inner Qi is represented by path_energy; stats.qi is progression only.
 			pass
 		PlayerStats.Path.MAGIC:
-			stats.mana = path_energy
+			# Current Mana is represented by path_energy; stats.mana is progression only.
+			pass
 		PlayerStats.Path.KNIGHTHOOD:
-			stats.aura = path_energy
+			# Current Aura is represented by path_energy; stats.aura is progression only.
+			pass
 		PlayerStats.Path.MARTIAL_ARTS:
-			stats.body_soul_will_sync = minf(path_energy, 100.0)
+			# Current Will Energy is represented by path_energy; body_soul_will_sync is progression only.
+			pass
 
 func _energy_name() -> String:
 	match stats.chosen_path:
