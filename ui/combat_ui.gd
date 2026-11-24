@@ -2,6 +2,8 @@ class_name CombatUI
 extends CanvasLayer
 
 signal language_changed(arabic: bool)
+signal portal_activate_requested
+signal chest_open_requested
 
 var player: ActionRPGPlayer
 var ui_root: Control
@@ -17,6 +19,18 @@ var skill_state: Dictionary = {}
 var level_up_banner: Label
 var respawn_overlay: PanelContainer
 var language_button: Button
+var stage_label: Label
+var boss_panel: PanelContainer
+var boss_title: Label
+var boss_bar: ProgressBar
+var portal_button: Button
+var fade_rect: ColorRect
+var current_stage: int = 1
+var sound_button: Button
+var gear_button: Button
+var chest_button: Button
+var gear_panel: PanelContainer
+var gear_content: VBoxContainer
 var respawn_title: Label
 var respawn_subtitle: Label
 var respawn_button: Button
@@ -35,6 +49,7 @@ func _ready() -> void:
 	player.breakthrough_completed.connect(_on_breakthrough_completed)
 	player.stats.path_selected.connect(_on_path_selected)
 	player.stats.experience_changed.connect(_on_experience_changed)
+	player.stats.equipment_changed.connect(_refresh_gear_panel)
 	_on_health_changed(player.health, player.max_health)
 	_on_energy_changed(player.path_energy, player.max_path_energy, player._energy_name())
 	_on_experience_changed(player.stats.experience, player.stats.experience_to_next_level)
@@ -42,6 +57,8 @@ func _ready() -> void:
 	for slot: int in range(1, 4):
 		_add_skill_button(slot)
 	_update_path_visibility(player.stats.chosen_path != PlayerStats.Path.NONE)
+	set_stage(player.stats.current_stage)
+	_refresh_gear_panel()
 
 func _build_hud() -> void:
 	ui_root = Control.new()
@@ -63,6 +80,26 @@ func _build_hud() -> void:
 	language_button.focus_mode = Control.FOCUS_NONE
 	language_button.pressed.connect(_on_language_pressed)
 	ui_root.add_child(language_button)
+	sound_button = Button.new()
+	sound_button.text = "🔊"
+	sound_button.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	sound_button.position = Vector2(-555.0, 24.0)
+	sound_button.size = Vector2(64.0, 64.0)
+	sound_button.focus_mode = Control.FOCUS_NONE
+	sound_button.pressed.connect(_on_sound_pressed)
+	ui_root.add_child(sound_button)
+	gear_button = Button.new()
+	gear_button.text = "GEAR / العتاد"
+	gear_button.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	gear_button.position = Vector2(-375.0, 96.0)
+	gear_button.size = Vector2(190.0, 58.0)
+	gear_button.focus_mode = Control.FOCUS_NONE
+	gear_button.pressed.connect(_toggle_gear_panel)
+	ui_root.add_child(gear_button)
+	_build_stage_label()
+	_build_boss_bar()
+	_build_portal_prompt()
+	_build_gear_panel()
 
 	var panel := PanelContainer.new()
 	panel.position = Vector2(24.0, 70.0)
@@ -122,6 +159,119 @@ func _build_hud() -> void:
 	level_up_banner.visible = false
 	ui_root.add_child(level_up_banner)
 	_build_respawn_overlay()
+
+func _build_stage_label() -> void:
+	stage_label = Label.new()
+	stage_label.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	stage_label.position = Vector2(0.0, 22.0)
+	stage_label.size = Vector2(1280.0, 42.0)
+	stage_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	stage_label.add_theme_color_override("font_color", Color("#bae6fd"))
+	stage_label.add_theme_font_size_override("font_size", 22)
+	ui_root.add_child(stage_label)
+
+func _build_boss_bar() -> void:
+	boss_panel = PanelContainer.new()
+	boss_panel.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	boss_panel.position = Vector2(280.0, 78.0)
+	boss_panel.size = Vector2(720.0, 92.0)
+	boss_panel.add_theme_stylebox_override("panel", _make_style(Color(0.12, 0.02, 0.05, 0.94), Color("#ef4444")))
+	boss_panel.visible = false
+	ui_root.add_child(boss_panel)
+	var content := VBoxContainer.new()
+	content.add_theme_constant_override("separation", 4)
+	boss_panel.add_child(content)
+	boss_title = Label.new()
+	boss_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	boss_title.add_theme_font_size_override("font_size", 20)
+	content.add_child(boss_title)
+	boss_bar = ProgressBar.new()
+	boss_bar.custom_minimum_size = Vector2(0.0, 34.0)
+	boss_bar.show_percentage = true
+	boss_bar.add_theme_font_size_override("font_size", 17)
+	content.add_child(boss_bar)
+
+func _build_portal_prompt() -> void:
+	portal_button = Button.new()
+	portal_button.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
+	portal_button.position = Vector2(-240.0, -145.0)
+	portal_button.size = Vector2(480.0, 82.0)
+	portal_button.custom_minimum_size = Vector2(480.0, 82.0)
+	portal_button.add_theme_font_size_override("font_size", 23)
+	portal_button.focus_mode = Control.FOCUS_NONE
+	portal_button.visible = false
+	portal_button.pressed.connect(func() -> void: portal_activate_requested.emit())
+	ui_root.add_child(portal_button)
+	fade_rect = ColorRect.new()
+	fade_rect.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	fade_rect.color = Color(0.0, 0.0, 0.04, 0.0)
+	fade_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	ui_root.add_child(fade_rect)
+
+func _build_gear_panel() -> void:
+	gear_panel = PanelContainer.new()
+	gear_panel.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	gear_panel.position = Vector2(-520.0, 165.0)
+	gear_panel.size = Vector2(490.0, 470.0)
+	gear_panel.visible = false
+	gear_panel.add_theme_stylebox_override("panel", _make_style(Color(0.04, 0.06, 0.12, 0.96), Color("#facc15")))
+	ui_root.add_child(gear_panel)
+	gear_content = VBoxContainer.new()
+	gear_content.add_theme_constant_override("separation", 7)
+	gear_panel.add_child(gear_content)
+
+func _on_sound_pressed() -> void:
+	var manager := get_tree().get_first_node_in_group("sound_manager")
+	if manager != null:
+		sound_button.text = "🔇" if not manager.toggle() else "🔊"
+
+func _toggle_gear_panel() -> void:
+	gear_panel.visible = not gear_panel.visible
+	if gear_panel.visible: _refresh_gear_panel()
+
+func _refresh_gear_panel() -> void:
+	if gear_content == null: return
+	for child in gear_content.get_children(): child.queue_free()
+	var title := Label.new(); title.text = _tr("GEAR / INVENTORY  [I]", "العتاد / الحقيبة  [I]"); title.add_theme_font_size_override("font_size", 22); gear_content.add_child(title)
+	var weapon := Label.new(); weapon.text = _gear_line("Weapon", player.stats.equipped_weapon); gear_content.add_child(weapon)
+	var armor := Label.new(); armor.text = _gear_line("Armor", player.stats.equipped_armor); gear_content.add_child(armor)
+	var separator := HSeparator.new(); gear_content.add_child(separator)
+	var inventory: Array = player.stats.inventory
+	if inventory.is_empty():
+		var empty := Label.new(); empty.text = _tr("No collected gear yet.", "لا يوجد عتاد ملتقط بعد."); gear_content.add_child(empty)
+	else:
+		for index in range(inventory.size()):
+			var item: Dictionary = inventory[index]
+			var row := HBoxContainer.new(); row.custom_minimum_size = Vector2(0.0, 58.0)
+			var label := Label.new(); label.size_flags_horizontal = Control.SIZE_EXPAND_FILL; label.text = "%s | %s" % [EquipmentData.localized_name(item, is_arabic), EquipmentData.rarity_name(item, is_arabic)]; row.add_child(label)
+			var equip := Button.new(); equip.text = _tr("EQUIP", "تجهيز"); equip.custom_minimum_size = Vector2(100.0, 52.0); equip.pressed.connect(func() -> void: player.stats.equip_gear(index)); row.add_child(equip)
+			var salvage := Button.new(); salvage.text = _tr("SALVAGE", "تفكيك"); salvage.custom_minimum_size = Vector2(105.0, 52.0); salvage.pressed.connect(func() -> void: player.stats.salvage_gear(index)); row.add_child(salvage)
+			gear_content.add_child(row)
+
+func _gear_line(slot: String, item: Dictionary) -> String:
+	if item.is_empty(): return "%s: %s" % [slot, _tr("Empty", "فارغ")]
+	return "%s: %s | %s | Power %s" % [slot, EquipmentData.localized_name(item, is_arabic), EquipmentData.rarity_name(item, is_arabic), item.get("power", 0)]
+
+func show_chest_prompt(value: bool) -> void:
+	if chest_button == null:
+		chest_button = Button.new()
+		chest_button.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
+		chest_button.position = Vector2(-240.0, -240.0)
+		chest_button.size = Vector2(480.0, 82.0)
+		chest_button.add_theme_font_size_override("font_size", 23)
+		chest_button.focus_mode = Control.FOCUS_NONE
+		chest_button.pressed.connect(func() -> void: chest_open_requested.emit())
+		ui_root.add_child(chest_button)
+	chest_button.text = _tr("OPEN CHEST  [E / F]", "فتح الصندوق  [E / F]")
+	chest_button.visible = value
+
+func show_loot_message(item: Dictionary) -> void:
+	level_up_banner.text = _tr("LOOT: %s" % EquipmentData.localized_name(item, false), "غنيمة: %s" % EquipmentData.localized_name(item, true))
+	level_up_banner.visible = true
+	var tween := level_up_banner.create_tween(); tween.tween_interval(2.0); tween.tween_property(level_up_banner, "modulate", Color(1, 1, 1, 0), 0.45)
+
+func _unhandled_input(event: InputEvent) -> void:
+	if event.is_action_pressed("toggle_gear"): _toggle_gear_panel()
 
 func _build_respawn_overlay() -> void:
 	respawn_overlay = PanelContainer.new()
@@ -264,6 +414,46 @@ func set_language(arabic: bool) -> void:
 	_on_experience_changed(player.stats.experience, player.stats.experience_to_next_level)
 	for slot: int in skill_buttons:
 		_refresh_skill_button(slot)
+	set_stage(current_stage)
+	if boss_panel.visible:
+		boss_title.text = _tr("ABYSSAL DEVOURER", "وحش الهاوية")
+	if portal_button.visible:
+		portal_button.text = _tr("ENTER NEXT STAGE  [E]", "دخول المرحلة التالية  [E]")
+
+func set_stage(stage_number: int) -> void:
+	current_stage = maxi(stage_number, 1)
+	var names := ["Ruined Village", "Crimson Highlands", "Astral Peak"]
+	var arabic_names := ["القرية المدمرة", "المرتفعات القرمزية", "القمة النجمية"]
+	var index := mini(current_stage - 1, names.size() - 1)
+	stage_label.text = _tr("STAGE %d  —  %s" % [current_stage, names[index]], "المرحلة %d  —  %s" % [current_stage, arabic_names[index]])
+
+func show_boss_bar(title: String, current: float, maximum: float) -> void:
+	boss_panel.visible = true
+	boss_title.text = title
+	boss_bar.max_value = maximum
+	boss_bar.value = current
+
+func update_boss_bar(current: float, maximum: float) -> void:
+	if boss_bar == null: return
+	boss_bar.max_value = maximum
+	boss_bar.value = current
+
+func hide_boss_bar() -> void:
+	if boss_panel != null: boss_panel.visible = false
+
+func show_portal_prompt(value: bool) -> void:
+	portal_button.visible = value
+	if value:
+		portal_button.text = _tr("ENTER NEXT STAGE  [E]", "دخول المرحلة التالية  [E]")
+
+func fade_transition() -> void:
+	if fade_rect == null: return
+	fade_rect.mouse_filter = Control.MOUSE_FILTER_STOP
+	var tween := fade_rect.create_tween()
+	tween.tween_property(fade_rect, "color:a", 1.0, 0.35)
+	tween.tween_interval(0.25)
+	tween.tween_property(fade_rect, "color:a", 0.0, 0.45)
+	tween.tween_callback(func() -> void: fade_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE)
 
 func _tr(english: String, arabic: String) -> String:
 	return arabic if is_arabic else english

@@ -48,6 +48,8 @@ var camera: Camera3D
 var attack_marker: MeshInstance3D
 var basic_hitbox: Area3D
 var ascension_aura: MeshInstance3D
+var equipped_weapon_visual: MeshInstance3D
+var equipped_armor_visual: MeshInstance3D
 
 func _ready() -> void:
 	add_to_group("player")
@@ -59,9 +61,11 @@ func _ready() -> void:
 		stats.path_selected.connect(_on_path_selected)
 		stats.level_up.connect(_on_stats_level_up)
 		stats.breakthrough_completed.connect(_on_breakthrough_completed)
+		stats.equipment_changed.connect(_on_equipment_changed)
 		_sync_derived_stats()
 		_update_ascension_aura()
 		_reset_energy()
+		_update_equipment_visuals()
 
 func _build_player_nodes() -> void:
 	collision_layer = 2
@@ -170,7 +174,7 @@ func _physics_process(delta: float) -> void:
 		movement = movement.normalized()
 	if movement.length_squared() > 1.0:
 		movement = movement.normalized()
-	var target_speed := stats.get_move_speed() * golden_aura_bonus
+	var target_speed := (stats.get_move_speed() + float(_gear_stat("speed")) * 0.25) * golden_aura_bonus
 	velocity.x = move_toward(velocity.x, movement.x * target_speed, 30.0 * delta)
 	velocity.z = move_toward(velocity.z, movement.z * target_speed, 30.0 * delta)
 	if is_on_floor():
@@ -209,7 +213,8 @@ func basic_attack() -> void:
 		return
 	attack_cooldown = attack_interval
 	attack_flash_time = 0.22
-	var damage := (12.0 + float(stats.strength) * 5.0) * golden_aura_bonus * stats.get_damage_multiplier()
+	var damage := (12.0 + float(stats.strength + _gear_stat("strength")) * 5.0) * golden_aura_bonus * stats.get_damage_multiplier()
+	_play_sound("play_slash")
 	basic_hitbox.rotation.y = camera_yaw
 	attack_marker.rotation.y = camera_yaw
 	basic_hitbox.monitoring = true
@@ -263,6 +268,7 @@ func use_skill(slot: int) -> void:
 	_sync_energy_to_stats()
 	skill_cooldowns[skill_id] = _skill_cooldown(skill_id)
 	_execute_skill(skill_id)
+	_play_sound("play_skill", [int(stats.chosen_path)])
 	energy_changed.emit(path_energy, max_path_energy, _energy_name())
 
 func _execute_skill(skill_id: String) -> void:
@@ -327,7 +333,8 @@ func take_damage(amount: float) -> void:
 		reduced -= absorbed
 	if reduced <= 0.0:
 		return
-	health = maxf(health - reduced, 0.0)
+		health = maxf(health - reduced, 0.0)
+		_play_sound("play_hit")
 	health_changed.emit(health, max_health)
 	if health <= 0.0:
 		is_defeated = true
@@ -347,6 +354,7 @@ func respawn_at(spawn_position: Vector3 = arena_spawn_position) -> void:
 	respawned.emit()
 
 func _on_stats_level_up(new_level: int) -> void:
+	_play_sound("play_level_up")
 	health = max_health
 	path_energy = max_path_energy
 	health_changed.emit(health, max_health)
@@ -355,6 +363,7 @@ func _on_stats_level_up(new_level: int) -> void:
 	level_up.emit(new_level)
 
 func _on_breakthrough_completed(new_rank: int) -> void:
+	_play_sound("play_level_up")
 	_update_ascension_aura()
 	_spawn_breakthrough_effect()
 	breakthrough_completed.emit(new_rank)
@@ -388,9 +397,9 @@ func _sync_derived_stats() -> void:
 		return
 	current_jump_velocity = BASE_JUMP_VELOCITY + float(maxi(stats.agility - 1, 0)) * 0.4
 	attack_interval = maxf(0.16, 0.42 - float(maxi(stats.agility - 1, 0)) * 0.025)
-	max_health = 70.0 + stats.strength * 12.0 + stats.willpower * 10.0
+	max_health = 70.0 + (stats.strength + _gear_stat("strength")) * 12.0 + (stats.willpower + _gear_stat("willpower")) * 10.0 + _gear_stat("health")
 	health = minf(health if health > 0.0 else max_health, max_health)
-	max_path_energy = (45.0 + stats.wisdom * 8.0) * stats.get_energy_multiplier()
+	max_path_energy = (45.0 + (stats.wisdom + _gear_stat("wisdom")) * 8.0 + _gear_stat("mana") * 3.0) * stats.get_energy_multiplier()
 	energy_regeneration = 2.5 + stats.wisdom * 0.55
 	_sync_energy_to_stats()
 	health_changed.emit(health, max_health)
@@ -609,3 +618,57 @@ func _make_emission_material(color: Color) -> StandardMaterial3D:
 	material.emission = color
 	material.emission_energy_multiplier = 3.0
 	return material
+
+func _gear_stat(stat_name: String) -> int:
+	var total := 0
+	for item in [stats.equipped_weapon, stats.equipped_armor]:
+		if item is Dictionary:
+			var values: Dictionary = item.get("stats", {})
+			total += int(values.get(stat_name, 0))
+	return total
+
+func _on_equipment_changed() -> void:
+	_sync_derived_stats()
+	_update_equipment_visuals()
+	_play_sound("play_equip")
+
+func _update_equipment_visuals() -> void:
+	if equipped_weapon_visual != null: equipped_weapon_visual.queue_free()
+	if equipped_armor_visual != null: equipped_armor_visual.queue_free()
+	equipped_weapon_visual = MeshInstance3D.new()
+	var weapon_item: Dictionary = stats.equipped_weapon
+	var weapon_mesh: Mesh
+	if stats.chosen_path == PlayerStats.Path.MARTIAL_ARTS:
+		var bracer := BoxMesh.new()
+		bracer.size = Vector3(0.28, 0.28, 0.75)
+		weapon_mesh = bracer
+	elif stats.chosen_path == PlayerStats.Path.CULTIVATION:
+		var blade := BoxMesh.new()
+		blade.size = Vector3(0.12, 0.12, 1.8)
+		weapon_mesh = blade
+	elif stats.chosen_path == PlayerStats.Path.MAGIC:
+		var staff := CylinderMesh.new()
+		staff.top_radius = 0.1
+		staff.bottom_radius = 0.1
+		staff.height = 1.9
+		weapon_mesh = staff
+	else:
+		var sword := BoxMesh.new()
+		sword.size = Vector3(0.18, 0.18, 1.8)
+		weapon_mesh = sword
+	equipped_weapon_visual.mesh = weapon_mesh
+	equipped_weapon_visual.position = Vector3(0.72, 1.05, -0.28)
+	equipped_weapon_visual.rotation_degrees = Vector3(12.0, 25.0, 24.0)
+	equipped_weapon_visual.material_override = _make_emission_material(Color("#facc15") if not weapon_item.is_empty() else Color("#64748b"))
+	add_child(equipped_weapon_visual)
+	equipped_armor_visual = MeshInstance3D.new()
+	var armor_mesh := BoxMesh.new()
+	armor_mesh.size = Vector3(1.05, 1.25, 0.62)
+	equipped_armor_visual.mesh = armor_mesh
+	equipped_armor_visual.position = Vector3(0.0, 1.05, 0.04)
+	equipped_armor_visual.material_override = _make_material(Color("#7c3aed") if not stats.equipped_armor.is_empty() else Color("#2563eb"), 0.35)
+	add_child(equipped_armor_visual)
+
+func _play_sound(method_name: String, arguments: Array = []) -> void:
+	var manager := get_tree().get_first_node_in_group("sound_manager")
+	if manager != null and manager.has_method(method_name): manager.callv(method_name, arguments)

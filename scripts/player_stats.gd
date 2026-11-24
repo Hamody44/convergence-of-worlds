@@ -12,6 +12,7 @@ signal level_up(new_level: int)
 signal ascension_changed(rank: int, progress: float)
 signal breakthrough_completed(new_rank: int)
 signal save_reset
+signal equipment_changed
 
 enum Path {
 	NONE,
@@ -30,6 +31,10 @@ const MAX_ASCENSION_RANK: int = 9
 @export var experience: int = 0
 @export var experience_to_next_level: int = 100
 @export var soul_points: int = 0
+@export var current_stage: int = 1
+@export var equipped_weapon: Dictionary = {}
+@export var equipped_armor: Dictionary = {}
+@export var inventory: Array[Dictionary] = []
 
 @export_category("Ascension")
 @export var ascension_rank: int = 1
@@ -109,6 +114,37 @@ func add_test_soul_point() -> void:
 	soul_points_changed.emit(soul_points)
 	save_to_disk()
 
+func set_stage(stage_number: int) -> void:
+	current_stage = maxi(stage_number, 1)
+	save_to_disk()
+	progression_changed.emit()
+
+func add_gear(item: Dictionary) -> void:
+	inventory.append(item.duplicate(true))
+	equipment_changed.emit()
+	save_to_disk()
+
+func equip_gear(index: int) -> bool:
+	if index < 0 or index >= inventory.size(): return false
+	var item: Dictionary = inventory[index]
+	if String(item.get("slot", "")) == "Weapon": equipped_weapon = item.duplicate(true)
+	else: equipped_armor = item.duplicate(true)
+	inventory.remove_at(index)
+	equipment_changed.emit()
+	save_to_disk()
+	return true
+
+func salvage_gear(index: int) -> bool:
+	if index < 0 or index >= inventory.size(): return false
+	if String(inventory[index].get("rarity", "Common")) == "Ascendant": soul_points += 1
+	experience += int(inventory[index].get("power", 1)) * 4
+	inventory.remove_at(index)
+	experience_changed.emit(experience, experience_to_next_level)
+	soul_points_changed.emit(soul_points)
+	equipment_changed.emit()
+	save_to_disk()
+	return true
+
 func spend_soul_point(stat_name: String) -> bool:
 	if soul_points <= 0:
 		return false
@@ -145,14 +181,10 @@ func advance_path_progress(amount: float) -> void:
 	if chosen_path == Path.NONE or amount <= 0.0:
 		return
 	match chosen_path:
-		Path.MARTIAL_ARTS:
-			body_soul_will_sync = minf(body_soul_will_sync + amount, 100.0)
-		Path.CULTIVATION:
-			qi += amount
-		Path.MAGIC:
-			magic_circles = maxi(magic_circles, 1)
-		Path.KNIGHTHOOD:
-			aura += amount
+		Path.MARTIAL_ARTS: body_soul_will_sync = minf(body_soul_will_sync + amount, 100.0)
+		Path.CULTIVATION: qi += amount
+		Path.MAGIC: magic_circles = maxi(magic_circles, 1)
+		Path.KNIGHTHOOD: aura += amount
 	ascension_progress = minf(ascension_progress + amount, 100.0)
 	progression_changed.emit()
 	ascension_changed.emit(ascension_rank, ascension_progress)
@@ -201,18 +233,8 @@ func get_path_description(path_value: Path, arabic: bool = false) -> String:
 
 func get_rank_name(rank: int = ascension_rank, arabic: bool = false) -> String:
 	var index := clampi(rank - 1, 0, MAX_ASCENSION_RANK - 1)
-	var english := [
-		["Mortal Body", "Iron Bone", "Bronze Skin", "Blood Purification", "Soul-Body Unity", "Spirit Meridian", "Heaven Shattering", "Martial Overlord", "Peak Martial Saint"],
-		["Qi Condensation", "Foundation Establishment", "Core Formation", "Golden Core", "Nascent Soul", "Soul Transformation", "Void Refinement", "Tribulation Transcendence", "Immortal Ascension"],
-		["1st Circle Apprentice", "2nd Circle Adept", "3rd Circle Mage", "4th Circle Master", "5th Circle Grand Mage", "6th Circle High Mage", "7th Circle Archmage", "8th Circle Grand Archmage", "9th Circle Supreme Archmage"],
-		["Mortal Squire", "Aura Knight", "Silver Knight", "Gold Knight", "Sword Master", "Grand Knight", "Radiant Knight", "Sovereign Knight", "Sovereign Radiant Knight"]
-	]
-	var arabic_names := [
-		["الجسد الفاني", "العظم الحديدي", "الجلد البرونزي", "تنقية الدم", "وحدة الروح والجسد", "مسارات الروح", "تحطيم السماء", "سيد الفنون القتالية", "قديس الفنون القتالية الأسمى"],
-		["تكثيف الـ Qi", "تأسيس الأساس", "تكوين النواة", "النواة الذهبية", "الروح الوليدة", "تحول الروح", "صقل الفراغ", "عبور المحنة", "الصعود إلى الخلود"],
-		["متدرب الدائرة الأولى", "متمرس الدائرة الثانية", "ساحر الدائرة الثالثة", "سيد الدائرة الرابعة", "الساحر الأعظم للدائرة الخامسة", "الساحر الأعلى للدائرة السادسة", "رئيس سحرة الدائرة السابعة", "رئيس السحرة الأعظم للدائرة الثامنة", "رئيس السحرة الأعلى للدائرة التاسعة"],
-		["الفارس المبتدئ", "فارس الـ Aura", "الفارس الفضي", "الفارس الذهبي", "سيد السيف", "الفارس الأعظم", "الفارس المشع", "الفارس السيادي", "الفارس السيادي المشع"]
-	]
+	var english := [["Mortal Body", "Iron Bone", "Bronze Skin", "Blood Purification", "Soul-Body Unity", "Spirit Meridian", "Heaven Shattering", "Martial Overlord", "Peak Martial Saint"], ["Qi Condensation", "Foundation Establishment", "Core Formation", "Golden Core", "Nascent Soul", "Soul Transformation", "Void Refinement", "Tribulation Transcendence", "Immortal Ascension"], ["1st Circle Apprentice", "2nd Circle Adept", "3rd Circle Mage", "4th Circle Master", "5th Circle Grand Mage", "6th Circle High Mage", "7th Circle Archmage", "8th Circle Grand Archmage", "9th Circle Supreme Archmage"], ["Mortal Squire", "Aura Knight", "Silver Knight", "Gold Knight", "Sword Master", "Grand Knight", "Radiant Knight", "Sovereign Knight", "Sovereign Radiant Knight"]]
+	var arabic_names := [["الجسد الفاني", "العظم الحديدي", "الجلد البرونزي", "تنقية الدم", "وحدة الروح والجسد", "مسارات الروح", "تحطيم السماء", "سيد الفنون القتالية", "قديس الفنون القتالية الأسمى"], ["تكثيف الـ Qi", "تأسيس الأساس", "تكوين النواة", "النواة الذهبية", "الروح الوليدة", "تحول الروح", "صقل الفراغ", "عبور المحنة", "الصعود إلى الخلود"], ["متدرب الدائرة الأولى", "متمرس الدائرة الثانية", "ساحر الدائرة الثالثة", "سيد الدائرة الرابعة", "الساحر الأعظم للدائرة الخامسة", "الساحر الأعلى للدائرة السادسة", "رئيس سحرة الدائرة السابعة", "رئيس السحرة الأعظم للدائرة الثامنة", "رئيس السحرة الأعلى للدائرة التاسعة"], ["الفارس المبتدئ", "فارس الـ Aura", "الفارس الفضي", "الفارس الذهبي", "سيد السيف", "الفارس الأعظم", "الفارس المشع", "الفارس السيادي", "الفارس السيادي المشع"]]
 	var path_index := maxi(int(chosen_path) - 1, 0)
 	return String((arabic_names if arabic else english)[path_index][index])
 
@@ -225,53 +247,13 @@ func get_path_metric(arabic: bool = false) -> String:
 func get_skill_definitions(arabic: bool = false) -> Array[Dictionary]:
 	match chosen_path:
 		Path.MARTIAL_ARTS:
-			if arabic:
-				return [
-					{"id": "iron_body", "name": "الجسد الحديدي", "description": "يزيد الصمود الجسدي.", "cost": 1},
-					{"id": "soul_palm", "name": "كف الروح", "description": "يركز قوة الروح في الهجمات.", "cost": 1},
-					{"id": "will_breaker", "name": "كاسر الإرادة", "description": "يحطم عزيمة العدو.", "cost": 2}
-				]
-			return [
-				{"id": "iron_body", "name": "Iron Body", "description": "Increase physical resilience.", "cost": 1},
-				{"id": "soul_palm", "name": "Soul Palm", "description": "Focus Soul power into attacks.", "cost": 1},
-				{"id": "will_breaker", "name": "Will Breaker", "description": "Break through enemy resolve.", "cost": 2}
-			]
+			return ([{"id": "iron_body", "name": "الجسد الحديدي", "description": "يزيد الصمود الجسدي.", "cost": 1}, {"id": "soul_palm", "name": "كف الروح", "description": "يركز قوة الروح في الهجمات.", "cost": 1}, {"id": "will_breaker", "name": "كاسر الإرادة", "description": "يحطم عزيمة العدو.", "cost": 2}] if arabic else [{"id": "iron_body", "name": "Iron Body", "description": "Increase physical resilience.", "cost": 1}, {"id": "soul_palm", "name": "Soul Palm", "description": "Focus Soul power into attacks.", "cost": 1}, {"id": "will_breaker", "name": "Will Breaker", "description": "Break through enemy resolve.", "cost": 2}])
 		Path.CULTIVATION:
-			if arabic:
-				return [
-					{"id": "qi_gathering", "name": "جمع الـ Qi", "description": "اجمع الـ Qi الداخلي بكفاءة أكبر.", "cost": 1},
-					{"id": "spirit_step", "name": "خطوة الروح", "description": "تحرك بخفة روحية أكبر.", "cost": 1},
-					{"id": "immortal_sword_qi", "name": "Qi السيف الخالد", "description": "شكّل الـ Qi في قوة سيف.", "cost": 2}
-				]
-			return [
-				{"id": "qi_gathering", "name": "Qi Gathering", "description": "Gather inner Qi more efficiently.", "cost": 1},
-				{"id": "spirit_step", "name": "Spirit Step", "description": "Move with a lighter spirit.", "cost": 1},
-				{"id": "immortal_sword_qi", "name": "Immortal Sword Qi", "description": "Shape Qi into sword power.", "cost": 2}
-			]
+			return ([{"id": "qi_gathering", "name": "جمع الـ Qi", "description": "اجمع الـ Qi الداخلي بكفاءة أكبر.", "cost": 1}, {"id": "spirit_step", "name": "خطوة الروح", "description": "تحرك بخفة روحية أكبر.", "cost": 1}, {"id": "immortal_sword_qi", "name": "Qi السيف الخالد", "description": "شكّل الـ Qi في قوة سيف.", "cost": 2}] if arabic else [{"id": "qi_gathering", "name": "Qi Gathering", "description": "Gather inner Qi more efficiently.", "cost": 1}, {"id": "spirit_step", "name": "Spirit Step", "description": "Move with a lighter spirit.", "cost": 1}, {"id": "immortal_sword_qi", "name": "Immortal Sword Qi", "description": "Shape Qi into sword power.", "cost": 2}])
 		Path.MAGIC:
-			if arabic:
-				return [
-					{"id": "mana_bolt", "name": "قذيفة Mana", "description": "أطلق قذيفة Mana مركزة.", "cost": 1},
-					{"id": "second_circle", "name": "الدائرة الثانية", "description": "افتح دائرة سحرية ثانية.", "cost": 1},
-					{"id": "arcane_shield", "name": "الدرع الغامض", "description": "كوّن حاجزًا سحريًا واقيًا.", "cost": 2}
-				]
-			return [
-				{"id": "mana_bolt", "name": "Mana Bolt", "description": "Release a focused Mana projectile.", "cost": 1},
-				{"id": "second_circle", "name": "Second Circle", "description": "Unlock a second Magic Circle.", "cost": 1},
-				{"id": "arcane_shield", "name": "Arcane Shield", "description": "Form a protective arcane barrier.", "cost": 2}
-			]
+			return ([{"id": "mana_bolt", "name": "قذيفة Mana", "description": "أطلق قذيفة Mana مركزة.", "cost": 1}, {"id": "second_circle", "name": "الدائرة الثانية", "description": "افتح دائرة سحرية ثانية.", "cost": 1}, {"id": "arcane_shield", "name": "الدرع الغامض", "description": "كوّن حاجزًا سحريًا واقيًا.", "cost": 2}] if arabic else [{"id": "mana_bolt", "name": "Mana Bolt", "description": "Release a focused Mana projectile.", "cost": 1}, {"id": "second_circle", "name": "Second Circle", "description": "Unlock a second Magic Circle.", "cost": 1}, {"id": "arcane_shield", "name": "Arcane Shield", "description": "Form a protective arcane barrier.", "cost": 2}])
 		Path.KNIGHTHOOD:
-			if arabic:
-				return [
-					{"id": "aura_slash", "name": "ضربة الـ Aura", "description": "مدد الضربة بطاقة الـ Aura.", "cost": 1},
-					{"id": "knight_dash", "name": "اندفاعة الفارس", "description": "اندفع بقوة وانضباط.", "cost": 1},
-					{"id": "golden_aura", "name": "الـ Aura الذهبية", "description": "أيقظ Aura ذهبية دفاعية.", "cost": 2}
-				]
-			return [
-				{"id": "aura_slash", "name": "Aura Slash", "description": "Extend a strike with Aura.", "cost": 1},
-				{"id": "knight_dash", "name": "Knight Dash", "description": "Dash with disciplined force.", "cost": 1},
-				{"id": "golden_aura", "name": "Golden Aura", "description": "Awaken a golden defensive Aura.", "cost": 2}
-			]
+			return ([{"id": "aura_slash", "name": "ضربة الـ Aura", "description": "مدد الضربة بطاقة الـ Aura.", "cost": 1}, {"id": "knight_dash", "name": "اندفاعة الفارس", "description": "اندفع بقوة وانضباط.", "cost": 1}, {"id": "golden_aura", "name": "الـ Aura الذهبية", "description": "أيقظ Aura ذهبية دفاعية.", "cost": 2}] if arabic else [{"id": "aura_slash", "name": "Aura Slash", "description": "Extend a strike with Aura.", "cost": 1}, {"id": "knight_dash", "name": "Knight Dash", "description": "Dash with disciplined force.", "cost": 1}, {"id": "golden_aura", "name": "Golden Aura", "description": "Awaken a golden defensive Aura.", "cost": 2}])
 	return []
 
 func get_skill_definition(skill_id: String, arabic: bool = false) -> Dictionary:
@@ -311,6 +293,10 @@ func reset_save() -> void:
 	experience = 0
 	experience_to_next_level = 100
 	soul_points = 0
+	current_stage = 1
+	equipped_weapon = {}
+	equipped_armor = {}
+	inventory.clear()
 	ascension_rank = 1
 	ascension_progress = 0.0
 	strength = 1
@@ -331,28 +317,10 @@ func reset_save() -> void:
 	soul_points_changed.emit(soul_points)
 	experience_changed.emit(experience, experience_to_next_level)
 	ascension_changed.emit(ascension_rank, ascension_progress)
+	equipment_changed.emit()
 
 func _to_dictionary() -> Dictionary:
-	return {
-		"chosen_path": int(chosen_path),
-		"level": level,
-		"experience": experience,
-		"experience_to_next_level": experience_to_next_level,
-		"soul_points": soul_points,
-		"ascension_rank": ascension_rank,
-		"ascension_progress": ascension_progress,
-		"strength": strength,
-		"wisdom": wisdom,
-		"agility": agility,
-		"speed": speed,
-		"willpower": willpower,
-		"body_soul_will_sync": body_soul_will_sync,
-		"qi": qi,
-		"magic_circles": magic_circles,
-		"mana": mana,
-		"aura": aura,
-		"unlocked_skills": unlocked_skills.keys()
-	}
+	return {"chosen_path": int(chosen_path), "level": level, "experience": experience, "experience_to_next_level": experience_to_next_level, "soul_points": soul_points, "current_stage": current_stage, "equipped_weapon": equipped_weapon, "equipped_armor": equipped_armor, "inventory": inventory, "ascension_rank": ascension_rank, "ascension_progress": ascension_progress, "strength": strength, "wisdom": wisdom, "agility": agility, "speed": speed, "willpower": willpower, "body_soul_will_sync": body_soul_will_sync, "qi": qi, "magic_circles": magic_circles, "mana": mana, "aura": aura, "unlocked_skills": unlocked_skills.keys()}
 
 func _apply_dictionary(data: Dictionary) -> void:
 	chosen_path = clampi(int(data.get("chosen_path", 0)), 0, 4) as Path
@@ -360,6 +328,12 @@ func _apply_dictionary(data: Dictionary) -> void:
 	experience = maxi(int(data.get("experience", 0)), 0)
 	experience_to_next_level = maxi(int(data.get("experience_to_next_level", 100)), 1)
 	soul_points = maxi(int(data.get("soul_points", 0)), 0)
+	current_stage = maxi(int(data.get("current_stage", 1)), 1)
+	equipped_weapon = data.get("equipped_weapon", {}) if data.get("equipped_weapon", {}) is Dictionary else {}
+	equipped_armor = data.get("equipped_armor", {}) if data.get("equipped_armor", {}) is Dictionary else {}
+	inventory.clear()
+	for item in data.get("inventory", []):
+		if item is Dictionary: inventory.append(item)
 	ascension_rank = clampi(int(data.get("ascension_rank", 1)), 1, MAX_ASCENSION_RANK)
 	ascension_progress = clampf(float(data.get("ascension_progress", 0.0)), 0.0, 100.0)
 	strength = maxi(int(data.get("strength", 1)), 1)

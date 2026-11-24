@@ -61,6 +61,18 @@ skill_3={
 "deadzone": 0.5,
 "events": [Object(InputEventKey,"physical_keycode":51,"unicode":51)]
 }
+use_portal={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"physical_keycode":69,"unicode":101)]
+}
+open_chest={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"physical_keycode":70,"unicode":102)]
+}
+toggle_gear={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"physical_keycode":73,"unicode":105)]
+}
 
 [layer_names]
 3d_physics/layer_1="World"
