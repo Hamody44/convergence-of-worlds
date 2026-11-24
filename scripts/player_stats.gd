@@ -22,7 +22,7 @@ enum Path {
 }
 
 const SAVE_PATH := "user://save_data.json"
-const MAX_ASCENSION_RANK: int = 4
+const MAX_ASCENSION_RANK: int = 9
 
 @export_category("Identity")
 @export var chosen_path: Path = Path.NONE
@@ -202,16 +202,16 @@ func get_path_description(path_value: Path, arabic: bool = false) -> String:
 func get_rank_name(rank: int = ascension_rank, arabic: bool = false) -> String:
 	var index := clampi(rank - 1, 0, MAX_ASCENSION_RANK - 1)
 	var english := [
-		["Mortal Body", "Iron Bone", "Soul-Body Unity", "Peak Martial Saint"],
-		["Qi Condensation", "Foundation Establishment", "Golden Core", "Immortal Ascension"],
-		["1st Circle Apprentice", "3rd Circle Mage", "6th Circle High Mage", "9th Circle Archmage"],
-		["Mortal Squire", "Aura Knight", "Sword Master", "Sovereign Radiant Knight"]
+		["Mortal Body", "Iron Bone", "Bronze Skin", "Blood Tempering", "Soul-Body Unity", "Spirit Meridian", "Heaven Shattering", "Martial Overlord", "Peak Martial Saint"],
+		["Qi Condensation", "Foundation Establishment", "Core Formation", "Golden Core", "Nascent Soul", "Soul Transformation", "Void Refinement", "Tribulation Transcendence", "Immortal Ascension"],
+		["1st Circle Apprentice", "2nd Circle Adept", "3rd Circle Mage", "4th Circle Master", "5th Circle Grand Mage", "6th Circle High Mage", "7th Circle Archmage", "8th Circle Grand Archmage", "9th Circle Archmage"],
+		["Mortal Squire", "Aura Knight", "Silver Knight", "Gold Knight", "Sword Master", "Grand Knight", "Radiant Knight", "Sovereign Knight", "Sovereign Radiant Knight"]
 	]
 	var arabic_names := [
-		["الجسد الفاني", "العظم الحديدي", "وحدة الروح والجسد", "قديس الفنون القتالية"],
-		["تكثيف الـ Qi", "تأسيس الأساس", "النواة الذهبية", "الصعود إلى الخلود"],
-		["متدرب الدائرة الأولى", "ساحر الدائرة الثالثة", "الساحر الأعلى للدائرة السادسة", "رئيس سحرة الدائرة التاسعة"],
-		["الفارس المبتدئ", "فارس الـ Aura", "سيد السيف", "الفارس السيادي المشع"]
+		["الجسد الفاني", "العظم الحديدي", "الجلد البرونزي", "صقل الدم", "وحدة الروح والجسد", "مسارات الروح", "تحطيم السماء", "سيد الفنون القتالية", "قديس الفنون القتالية الأسمى"],
+		["تكثيف الـ Qi", "تأسيس الأساس", "تكوين النواة", "النواة الذهبية", "الروح الوليدة", "تحول الروح", "صقل الفراغ", "عبور المحنة", "الصعود إلى الخلود"],
+		["متدرب الدائرة الأولى", "متمرس الدائرة الثانية", "ساحر الدائرة الثالثة", "سيد الدائرة الرابعة", "الساحر الأعظم للدائرة الخامسة", "الساحر الأعلى للدائرة السادسة", "رئيس سحرة الدائرة السابعة", "رئيس السحرة الأعظم للدائرة الثامنة", "رئيس سحرة الدائرة التاسعة"],
+		["الفارس المبتدئ", "فارس الـ Aura", "الفارس الفضي", "الفارس الذهبي", "سيد السيف", "الفارس الأعظم", "الفارس المشع", "الفارس السيادي", "الفارس السيادي المشع"]
 	]
 	var path_index := maxi(int(chosen_path) - 1, 0)
 	return String((arabic_names if arabic else english)[path_index][index])
