@@ -9,6 +9,8 @@ const PROGRESSION_UI_SCRIPT := preload("res://ui/progression_ui.gd")
 const COMBAT_UI_SCRIPT := preload("res://ui/combat_ui.gd")
 
 var player: ActionRPGPlayer
+var progression_ui: ProgressionUI
+var combat_ui: CombatUI
 
 func _ready() -> void:
 	_build_world()
@@ -48,7 +50,7 @@ func _build_world() -> void:
 	_make_box("ObstacleC", Vector3(0.0, 0.6, 7.0), Vector3(5.0, 1.2, 2.0), Color("#b45309"))
 	
 	var label := Label3D.new()
-	label.text = "ASCENSION — PHASE 4"
+	label.text = "ASCENSION — PHASE 5"
 	label.position = Vector3(0.0, 4.0, -10.0)
 	label.font_size = 48
 	label.modulate = Color("#f8fafc")
@@ -59,6 +61,7 @@ func _build_player() -> void:
 	player = PLAYER_SCRIPT.new()
 	player.name = "Player"
 	player.stats = STATS_SCRIPT.new()
+	player.stats.load_from_disk()
 	player.position = Vector3(0.0, 0.2, 6.0)
 	player.arena_spawn_position = player.position
 	add_child(player)
@@ -96,16 +99,21 @@ func _build_touch_ui() -> void:
 	touch_ui.camera_dragged.connect(_on_camera_dragged)
 
 func _build_progression_ui() -> void:
-	var progression_ui: ProgressionUI = PROGRESSION_UI_SCRIPT.new()
+	progression_ui = PROGRESSION_UI_SCRIPT.new()
 	progression_ui.name = "ProgressionUI"
 	progression_ui.player = player
 	add_child(progression_ui)
 
 func _build_combat_ui() -> void:
-	var combat_ui: CombatUI = COMBAT_UI_SCRIPT.new()
+	combat_ui = COMBAT_UI_SCRIPT.new()
 	combat_ui.name = "CombatUI"
 	combat_ui.player = player
 	add_child(combat_ui)
+	combat_ui.language_changed.connect(_on_language_changed)
+
+func _on_language_changed(arabic: bool) -> void:
+	if is_instance_valid(progression_ui):
+		progression_ui.set_language(arabic)
 
 func _on_touch_movement_changed(value: Vector2) -> void:
 	if is_instance_valid(player):

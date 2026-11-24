@@ -7,6 +7,7 @@ signal skill_state_changed(slot: int, skill_name: String, unlocked: bool, cooldo
 signal defeated
 signal respawned
 signal level_up(new_level: int)
+signal breakthrough_completed(new_rank: int)
 
 @export var stats: PlayerStats = PlayerStats.new()
 
@@ -46,6 +47,7 @@ var spring_arm: SpringArm3D
 var camera: Camera3D
 var attack_marker: MeshInstance3D
 var basic_hitbox: Area3D
+var ascension_aura: MeshInstance3D
 
 func _ready() -> void:
 	add_to_group("player")
@@ -56,7 +58,9 @@ func _ready() -> void:
 		stats.stat_changed.connect(_on_stat_changed)
 		stats.path_selected.connect(_on_path_selected)
 		stats.level_up.connect(_on_stats_level_up)
+		stats.breakthrough_completed.connect(_on_breakthrough_completed)
 		_sync_derived_stats()
+		_update_ascension_aura()
 		_reset_energy()
 
 func _build_player_nodes() -> void:
@@ -82,6 +86,15 @@ func _build_player_nodes() -> void:
 	visual.position.y = 0.95
 	visual.material_override = _make_material(Color("#3b82f6"), 0.15)
 	add_child(visual)
+
+	ascension_aura = MeshInstance3D.new()
+	var aura_mesh := TorusMesh.new()
+	aura_mesh.inner_radius = 0.68
+	aura_mesh.outer_radius = 0.78
+	ascension_aura.mesh = aura_mesh
+	ascension_aura.position.y = 0.12
+	ascension_aura.material_override = _make_emission_material(Color("#facc15"))
+	add_child(ascension_aura)
 	
 	var head := MeshInstance3D.new()
 	var head_mesh := SphereMesh.new()
@@ -196,7 +209,7 @@ func basic_attack() -> void:
 		return
 	attack_cooldown = attack_interval
 	attack_flash_time = 0.22
-	var damage := (12.0 + float(stats.strength) * 5.0) * golden_aura_bonus
+	var damage := (12.0 + float(stats.strength) * 5.0) * golden_aura_bonus * stats.get_damage_multiplier()
 	basic_hitbox.rotation.y = camera_yaw
 	attack_marker.rotation.y = camera_yaw
 	basic_hitbox.monitoring = true
@@ -254,6 +267,7 @@ func use_skill(slot: int) -> void:
 
 func _execute_skill(skill_id: String) -> void:
 	var damage_scale := 1.0 + float(stats.wisdom) * 0.08 if stats.chosen_path == PlayerStats.Path.MAGIC else 1.0
+	damage_scale *= stats.get_damage_multiplier()
 	if qi_boost_time > 0.0:
 		damage_scale *= 1.5
 	match skill_id:
@@ -340,6 +354,11 @@ func _on_stats_level_up(new_level: int) -> void:
 	_spawn_level_up_effect()
 	level_up.emit(new_level)
 
+func _on_breakthrough_completed(new_rank: int) -> void:
+	_update_ascension_aura()
+	_spawn_breakthrough_effect()
+	breakthrough_completed.emit(new_rank)
+
 func rotate_camera_by(delta_pixels: Vector2) -> void:
 	camera_yaw -= delta_pixels.x * CAMERA_SENSITIVITY
 	camera_pitch = clampf(camera_pitch - delta_pixels.y * CAMERA_SENSITIVITY, -0.95, 0.35)
@@ -371,7 +390,7 @@ func _sync_derived_stats() -> void:
 	attack_interval = maxf(0.16, 0.42 - float(maxi(stats.agility - 1, 0)) * 0.025)
 	max_health = 70.0 + stats.strength * 12.0 + stats.willpower * 10.0
 	health = minf(health if health > 0.0 else max_health, max_health)
-	max_path_energy = 45.0 + stats.wisdom * 8.0
+	max_path_energy = (45.0 + stats.wisdom * 8.0) * stats.get_energy_multiplier()
 	energy_regeneration = 2.5 + stats.wisdom * 0.55
 	_sync_energy_to_stats()
 	health_changed.emit(health, max_health)
@@ -381,6 +400,7 @@ func _on_stat_changed(_stat_name: String, _new_value: int) -> void:
 	_sync_derived_stats()
 
 func _on_path_selected(_path_value: PlayerStats.Path) -> void:
+	_update_ascension_aura()
 	_reset_energy()
 
 func _reset_energy() -> void:
@@ -548,6 +568,28 @@ func _spawn_level_up_effect() -> void:
 	tween.tween_property(ring, "scale", Vector3.ONE * 2.4, 1.0)
 	tween.tween_property(ring, "modulate", Color(1.0, 1.0, 1.0, 0.0), 1.0)
 	tween.chain().tween_callback(ring.queue_free)
+
+func _update_ascension_aura() -> void:
+	if ascension_aura == null or stats == null:
+		return
+	ascension_aura.visible = stats.chosen_path != PlayerStats.Path.NONE
+	var aura_scale := 1.0 + float(maxi(stats.ascension_rank - 1, 0)) * 0.22
+	ascension_aura.scale = Vector3.ONE * aura_scale
+
+func _spawn_breakthrough_effect() -> void:
+	var shockwave := MeshInstance3D.new()
+	var mesh := TorusMesh.new()
+	mesh.inner_radius = 0.25
+	mesh.outer_radius = 0.65
+	shockwave.mesh = mesh
+	shockwave.position.y = 0.2
+	shockwave.material_override = _make_emission_material(Color("#fbbf24"))
+	add_child(shockwave)
+	var tween := shockwave.create_tween()
+	tween.set_parallel(true)
+	tween.tween_property(shockwave, "scale", Vector3.ONE * 4.0, 0.75)
+	tween.tween_property(shockwave, "modulate", Color(1.0, 1.0, 1.0, 0.0), 0.75)
+	tween.chain().tween_callback(shockwave.queue_free)
 
 func _apply_camera_rotation() -> void:
 	if camera_rig == null:
